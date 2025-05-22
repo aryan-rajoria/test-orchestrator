@@ -7,7 +7,7 @@ import pathlib
 import shutil
 import subprocess
 import time
-import docker # type: ignore
+import docker
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -16,12 +16,10 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 # --- Configuration ---
-# Base Docker image for running atom tools
 ATOM_DOCKER_IMAGE = "ghcr.io/appthreat/atom:latest"
-# Native image download URL (assuming Linux amd64, adjust if necessary)
 ATOM_NATIVE_IMAGE_URL_LINUX = "https://github.com/AppThreat/atom/releases/latest/download/atom-amd64"
 ATOM_NATIVE_IMAGE_NAME_LINUX = "atom-amd64"
-ATOM_NATIVE_EXECUTABLE_NAME = "atom-native" # Name it will be moved to in /usr/local/bin
+ATOM_NATIVE_EXECUTABLE_NAME = "atom-native"
 
 class ProjectProcessor:
     """
@@ -63,7 +61,6 @@ class ProjectProcessor:
             with open(self.project_config_path, 'r') as f:
                 config_data = json.load(f)
             
-            # Basic validation
             if not config_data.get("github_url") or not config_data.get("language"):
                 logger.error(f"Config {self.project_config_path} missing github_url or language.")
                 return None
@@ -71,7 +68,7 @@ class ProjectProcessor:
                 logger.warning(f"Language in config ({config_data['language']}) "
                                f"differs from directory structure ({self.project_lang}). Using directory structure.")
             
-            config_data["language"] = self.project_lang # Standardize based on folder
+            config_data["language"] = self.project_lang
             
             if "atom_operations" not in config_data or not isinstance(config_data["atom_operations"], list):
                 logger.error(f"Config {self.project_config_path} missing 'atom_operations' list.")
@@ -105,20 +102,17 @@ class ProjectProcessor:
         """Clones the project's GitHub repository."""
         logger.info(f"Cloning {self.config['github_url']} into {self.project_clone_path}...")
         if self.project_clone_path.exists():
-            logger.info(f"Clone path {self.project_clone_path} already exists. Skipping clone.")
-            # Potentially add a 'force_clone' or 'pull' option here
+            logger.info(f"Clone path {self.project_clone_path} already exists. Skipping clone.")    
             return True
         
         self.project_clone_path.mkdir(parents=True, exist_ok=True)
         
-        # Run pre-clone host commands if any
         for cmd_str in self.config.get("host_pre_clone_commands", []):
             if not self._run_host_command(cmd_str.split(), cwd=self.project_clone_path.parent): return False
 
         if not self._run_host_command(["git", "clone", self.config["github_url"], str(self.project_clone_path.name)], cwd=self.project_clone_path.parent):
             return False
         
-        # Run post-clone host commands if any (e.g., git submodule update)
         for cmd_str in self.config.get("host_post_clone_commands", []):
             if not self._run_host_command(cmd_str.split(), cwd=self.project_clone_path): return False
             
@@ -132,7 +126,6 @@ class ProjectProcessor:
 
         logger.info(f"Starting Docker container '{self.container_name}' from image '{ATOM_DOCKER_IMAGE}'...")
         try:
-            # Ensure the Docker image is pulled
             try:
                 self.docker_client.images.get(ATOM_DOCKER_IMAGE)
                 logger.info(f"Image {ATOM_DOCKER_IMAGE} found locally.")
@@ -146,24 +139,17 @@ class ProjectProcessor:
                 name=self.container_name,
                 volumes={str(self.project_clone_path.resolve()): {'bind': '/app', 'mode': 'rw'}},
                 working_dir='/app',
-                command="sleep infinity", # Keep container running
+                command="sleep infinity",
                 detach=True,
-                auto_remove=False # Keep it for exec, will remove manually
+                auto_remove=False
             )
-            # try:
-            #     self.container.exec_run("curl -LO https://github.com/AppThreat/atom/releases/latest/download/atom-amd64")
-            #     self.container.exec_run("chmod +x atom-amd64")
-            #     exec_result = self.container.exec_run("./atom-amd64 --help")
 
-            # except docker.errors.DockerException as e:
-            #     logger.error(f"exec_run {e}")
-            # Wait a moment for the container to be fully up
             time.sleep(5) 
             logger.info(f"Container '{self.container_name}' started with ID: {self.container.id}")
             return True
         except docker.errors.APIError as e:
             logger.error(f"Docker API error starting container: {e}")
-            if "409" in str(e) and "Conflict" in str(e): # Container already exists
+            if "409" in str(e) and "Conflict" in str(e): 
                 logger.warning(f"Container {self.container_name} already exists. Attempting to use it.")
                 try:
                     self.container = self.docker_client.containers.get(self.container_name)
@@ -184,21 +170,20 @@ class ProjectProcessor:
             return -1, "", "Container not started"
 
         if isinstance(command, list):
-            command_str = " ".join(command) # For logging
+            command_str = " ".join(command) 
             cmd_to_exec = command
-        else: # If it's a single string, execute with sh -c for shell features
+        else: 
             command_str = command
             cmd_to_exec = ["sh", "-c", command]
 
         logger.info(f"Container EXEC (workdir: {workdir}, user: {user}): {command_str}")
         
         try:
-            # Ensure container is running
             self.container.reload()
             if self.container.status != "running":
                 logger.warning(f"Container {self.container_name} was not running. Attempting to start.")
                 self.container.start()
-                time.sleep(3) # Give it a moment
+                time.sleep(3)
                 self.container.reload()
                 if self.container.status != "running":
                     logger.error(f"Failed to restart container {self.container_name}. Cannot exec.")
@@ -226,9 +211,6 @@ class ProjectProcessor:
         except docker.errors.APIError as e:
             logger.error(f"Docker API error during exec: {e}")
             return -1, "", str(e)
-        # except Exception as e:
-        #     logger.error(f"Unexpected error during exec: {e}")
-        #     return -1, "", str(e)
 
     def _install_atom_tools_in_container(self) -> bool:
         """Installs atom (npm), native image, cdxgen, and parsetools in the container."""
@@ -298,13 +280,10 @@ class ProjectProcessor:
         project_lang = self.config["language"]
         project_source_container_path = self.config.get("project_dir_in_repo", ".")
         
-        # Ensure cdxgen runs if reachables are planned (as per atom docs)
-        # This is a heuristic. A more robust way would be to have explicit cdxgen steps in config.
         has_reachables = any(op.get("atom_main_command") == "reachables" for op in self.config.get("atom_operations", []))
         if has_reachables:
             logger.info("Reachables operation detected, ensuring SBOM generation with cdxgen...")
-            # cdxgen output is typically bom.json or bom.xml in the project root
-            # The -o . means output to current dir (/app/project_subdir)
+
             cdxgen_cmd = f"cdxgen -o bom.json --project-path ." 
             exit_code, _, _ = self._exec_in_container(cdxgen_cmd, workdir=f"/app/{project_source_container_path}")
             if exit_code != 0:
@@ -327,8 +306,7 @@ class ProjectProcessor:
             # Input is the project directory relative to /app
             atom_cmd_parts = [atom_executable, main_cmd]
 
-            # Output files (-o and -s)
-            # These paths are relative to /app inside the container
+
             primary_out_container = operation.get("atom_primary_output_container")
             slice_out_container = operation.get("atom_slice_output_container")
             
@@ -337,18 +315,14 @@ class ProjectProcessor:
             if slice_out_container:
                 atom_cmd_parts.extend(["-s", slice_out_container])
 
-            # Language
             atom_cmd_parts.extend(["-l", project_lang])
 
-            # Extra arguments
             extra_args = operation.get("extra_args", [])
             for arg in extra_args:
                 atom_cmd_parts.append(str(arg).replace("{language}", project_lang)) # Substitution
 
-            # Input directory (last argument)
-            atom_cmd_parts.append(".") # Current directory within workdir
+            atom_cmd_parts.append(".")
 
-            # Execute
             exit_code, stdout, stderr = self._exec_in_container(
                 atom_cmd_parts,
                 workdir=f"/app/{project_source_container_path}"
@@ -356,10 +330,8 @@ class ProjectProcessor:
 
             if exit_code != 0:
                 logger.error(f"Atom operation '{op_name}' using '{atom_executable}' failed.")
-                # Continue to next operation, don't stop all processing for one failure
             else:
                 logger.info(f"Atom operation '{op_name}' using '{atom_executable}' successful.")
-                # Copy specified outputs
                 files_to_copy = []
                 if primary_out_container and operation.get("copy_primary_output", False): # Add a flag if needed
                      files_to_copy.append((f"/app/{project_source_container_path}/{primary_out_container}", 
@@ -370,7 +342,7 @@ class ProjectProcessor:
                 
                 for container_src, host_dest in files_to_copy:
                     self._copy_from_container(container_src, host_dest)
-        return True # Overall success of running operations (individual failures are logged)
+        return True
 
     def _copy_from_container(self, container_path: str, host_path: pathlib.Path) -> bool:
         """Copies a file or directory from the container to the host."""
@@ -382,7 +354,6 @@ class ProjectProcessor:
         host_path.parent.mkdir(parents=True, exist_ok=True)
         
         try:
-            # Check if path exists in container first
             exit_code, stdout, _ = self._exec_in_container(['test', '-e', container_path])
             if exit_code != 0:
                 logger.warning(f"Path '{container_path}' does not exist in container. Cannot copy.")
@@ -390,67 +361,41 @@ class ProjectProcessor:
 
             bits, stat = self.container.get_archive(container_path)
             
-            # Write the tar archive to a temporary file
             temp_tar_path = self.base_workspace_dir / f"temp_{self.container_name}_{os.path.basename(container_path)}.tar"
             with open(temp_tar_path, 'wb') as f:
                 for chunk in bits:
                     f.write(chunk)
             
-            # Extract the tar archive to the destination
-            # If it's a single file, it will be extracted into the parent dir with its original name.
-            # If it's a dir, its contents will be extracted.
-            # We want to place it *at* host_path.
-            
-            # If host_path is intended to be a file:
-            if not host_path.suffix: # Heuristic: if no suffix, assume it's a dir
-                 host_path.mkdir(parents=True, exist_ok=True) # Ensure dir exists
+            if not host_path.suffix: 
+                 host_path.mkdir(parents=True, exist_ok=True)
                  extract_to_dir = host_path
-            else: # Assume it's a file
+            else:
                  host_path.parent.mkdir(parents=True, exist_ok=True)
                  extract_to_dir = host_path.parent
 
             import tarfile
             with tarfile.open(temp_tar_path, 'r') as tar:
-                # To handle cases where tar contains a single top-level dir
                 members = tar.getmembers()
                 if len(members) == 1 and members[0].isdir():
-                    # Extract contents of this single dir into extract_to_dir
-                    # We need to strip the leading directory component from member names
-                    for member in members: # Re-fetch to reset internal pointer if any
+                    for member in members:
                         original_name = member.name
                         member.name = os.path.relpath(member.name, members[0].name)
-                        if member.name == ".": continue # Skip the directory itself
+                        if member.name == ".": continue 
                         tar.extract(member, path=extract_to_dir)
-                    # If the original host_path was a file name, and we extracted a dir
-                    # we might need to move the contents.
-                    # This part is tricky. For now, assume simple file copy.
-                    # If container_path is a file, tar will contain that file.
-                    # If host_path is file_A, it extracts to extract_to_dir/file_A_original_name
-                    # This needs refinement if copying single files vs dirs.
-                    # Let's assume container_path is mostly files for atom outputs.
-                    
-                    # Simplified: extract all, then move if necessary
-                    # This logic assumes the tar contains the file directly, not in a subdirectory.
-                    # If container_path is /app/data/output.json, tar will have output.json.
-                    # It will be extracted to extract_to_dir/output.json
-                    # If host_path was /tmp/my_output.json, we need to move extract_to_dir/output.json to /tmp/my_output.json
+
                     tar.extractall(path=extract_to_dir)
                     extracted_file_name = os.path.basename(container_path)
                     if (extract_to_dir / extracted_file_name).exists() and str(host_path.name) != extracted_file_name:
                         shutil.move(str(extract_to_dir / extracted_file_name), str(host_path))
                     elif not (extract_to_dir / host_path.name).exists() and (extract_to_dir / extracted_file_name).is_file():
-                         # if host_path is /target/dir/desired_name.json and it extracted as /target/dir/original_name.json
                          if host_path.parent == extract_to_dir and host_path.name != extracted_file_name:
                             os.rename(extract_to_dir / extracted_file_name, host_path)
 
 
-                else: # multiple files/dirs or single file not in a dir
+                else:
                     tar.extractall(path=extract_to_dir)
-                    # If host_path is a file, and tar extracted a file with the same name into extract_to_dir
-                    # then it should be at extract_to_dir / host_path.name
-                    # If that's not the case, it means the tar had a different structure.
 
-            temp_tar_path.unlink() # Clean up temp tar
+            temp_tar_path.unlink()
             logger.info(f"Successfully copied to {host_path}")
             return True
 
