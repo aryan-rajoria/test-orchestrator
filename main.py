@@ -87,27 +87,18 @@ def main():
 
     overall_success = True
     for config_path in project_config_files:
-        processor = None # Ensure processor is None if init fails
+        processor = None 
         try:
             processor = ProjectProcessor(config_path, args.input_dir, args.workspace_dir, args.output_dir, docker_client)
-            
-            # Apply skip flags from CLI args to the processor instance or its methods
-            # This is a bit manual; a more elegant way might be to pass args object or use a config object.
-            if args.skip_cloning: processor._clone_repo = lambda: True # Monkey patch for skipping
-            if args.skip_docker_tools_install: processor.tools_installed_in_container = True 
 
-            # For skipping JAR/Native/Compare, we'll modify the process method or check flags within it.
-            # The current ProjectProcessor.process() method already has logging for these stages.
-            # We can make it more granular if needed. For now, let's assume the user will comment out calls if needed
-            # or we add more explicit flags to the process method.
-            # For simplicity, the current ProjectProcessor.process() will run all stages unless internal errors occur.
-            # The provided flags are more for overall script control.
+            if args.skip_cloning: processor._clone_repo = lambda: True
+            if args.skip_docker_tools_install: processor.tools_installed_in_container = True 
 
             if not processor.process():
                 logger.error(f"Processing failed for {processor.project_lang}/{processor.project_name}")
                 overall_success = False
             
-        except ValueError as ve: # From _load_config
+        except ValueError as ve: 
             logger.error(f"Skipping project due to config error: {config_path} - {ve}")
             overall_success = False
         except Exception as e:
@@ -116,7 +107,7 @@ def main():
         finally:
             if processor and args.keep_containers and processor.container:
                 logger.info(f"Keeping container {processor.container_name} as per --keep-containers flag.")
-            elif processor and not args.keep_containers: # Ensure cleanup if not keeping and processor exists
+            elif processor and not args.keep_containers:
                  processor._cleanup_container()
 
 

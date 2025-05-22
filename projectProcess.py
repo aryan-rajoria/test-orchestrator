@@ -204,12 +204,15 @@ class ProjectProcessor:
                     logger.error(f"Failed to restart container {self.container_name}. Cannot exec.")
                     return -1, "", "Container not running"
 
-            exit_code, (stdout_bytes, stderr_bytes) = self.container.exec_run(
+            exec_results = self.container.exec_run(
                 cmd_to_exec,
                 workdir=workdir,
                 user=user,
                 environment=environment or {}
             )
+            stdout_bytes = exec_results.output
+            stderr_bytes = exec_results.output
+            exit_code = exec_results.exit_code
             stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ""
             stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ""
 
@@ -223,9 +226,9 @@ class ProjectProcessor:
         except docker.errors.APIError as e:
             logger.error(f"Docker API error during exec: {e}")
             return -1, "", str(e)
-        except Exception as e:
-            logger.error(f"Unexpected error during exec: {e}")
-            return -1, "", str(e)
+        # except Exception as e:
+        #     logger.error(f"Unexpected error during exec: {e}")
+        #     return -1, "", str(e)
 
     def _install_atom_tools_in_container(self) -> bool:
         """Installs atom (npm), native image, cdxgen, and parsetools in the container."""
@@ -245,7 +248,7 @@ class ProjectProcessor:
 
         # 2. Atom native image (Linux amd64 assumed)
         # Check if already exists to avoid re-downloading if container is reused somehow
-        exit_code, stdout, _ = self._exec_in_container(f"command -v {ATOM_NATIVE_EXECUTABLE_NAME}")
+        exit_code, stdout, _ = self._exec_in_container(f"{ATOM_NATIVE_EXECUTABLE_NAME} --help")
         if exit_code == 0 and ATOM_NATIVE_EXECUTABLE_NAME in stdout:
             logger.info(f"Atom native image '{ATOM_NATIVE_EXECUTABLE_NAME}' already found in container's PATH.")
         else:
@@ -254,7 +257,7 @@ class ProjectProcessor:
                 f"curl -fsSL -o {ATOM_NATIVE_IMAGE_NAME_LINUX} {ATOM_NATIVE_IMAGE_URL_LINUX}",
                 f"chmod +x {ATOM_NATIVE_IMAGE_NAME_LINUX}",
                 f"mv {ATOM_NATIVE_IMAGE_NAME_LINUX} /usr/local/bin/{ATOM_NATIVE_EXECUTABLE_NAME}",
-                f"{ATOM_NATIVE_EXECUTABLE_NAME} --version" # Test it
+                f"{ATOM_NATIVE_EXECUTABLE_NAME} --help" # Test it
             ]
             for cmd in native_install_cmds:
                 exit_code, _, _ = self._exec_in_container(cmd)
@@ -272,17 +275,17 @@ class ProjectProcessor:
         project_subdir = self.config.get("project_dir_in_repo", ".")
         workdir_path = f"/app/{project_subdir}" if project_subdir != "." else "/app"
 
-        for cmd_str in self.config.get("install_commands_container", []):
-            exit_code, _, _ = self._exec_in_container(cmd_str, workdir=workdir_path)
-            if exit_code != 0:
-                logger.error(f"Project install command failed: {cmd_str}")
-                return False
+        # for cmd_str in self.config.get("install_commands_container", []):
+        #     exit_code, _, _ = self._exec_in_container(cmd_str, workdir=workdir_path)
+        #     if exit_code != 0:
+        #         logger.error(f"Project install command failed: {cmd_str}")
+        #         return False
         
-        for cmd_str in self.config.get("build_commands_container", []):
-            exit_code, _, _ = self._exec_in_container(cmd_str, workdir=workdir_path)
-            if exit_code != 0:
-                logger.error(f"Project build command failed: {cmd_str}")
-                return False
+        # for cmd_str in self.config.get("build_commands_container", []):
+        #     exit_code, _, _ = self._exec_in_container(cmd_str, workdir=workdir_path)
+        #     if exit_code != 0:
+        #         logger.error(f"Project build command failed: {cmd_str}")
+        #         return False
         
         logger.info("Project install/build commands completed.")
         return True

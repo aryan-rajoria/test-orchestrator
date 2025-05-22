@@ -15,8 +15,8 @@
       "atom_slice_output_container": "usages.slices.json",
       "host_target_file_suffix": "usages.slices.json",
       "is_json_diff_target": true,
-      "cjd_preset_type": "bom",
-      "extra_args": ["--min-num-calls", "1"]
+      "cjd_preset_type": "bom"
+       
     }
   ]
 }
