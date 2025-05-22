@@ -1,0 +1,27 @@
+{
+  "github_url": "https://github.com/electron/electron.git",
+  "language": "cpp", 
+  "project_dir_in_repo": ".",
+  "host_post_clone_commands": [
+    "gclient sync --with_branch_heads --with_tags"
+  ],
+  "install_commands_container": [
+    "# Assuming gclient and other build tools (depot_tools, ninja, clang) are pre-installed in Docker",
+    "cd src",
+    "gn gen out/Testing --args='import(\"//electron/build/args/testing.gn\")'",
+    "ninja -C out/Testing electron"
+  ],
+  "build_commands_container": [],
+  "atom_operations": [
+    {
+      "name": "cpp_usages_analysis_electron_core",
+      "atom_main_command": "usages",
+      "atom_primary_output_container": "app.atom",
+      "atom_slice_output_container": "usages.slices.json",
+      "host_target_file_suffix": "usages.slices.json",
+      "is_json_diff_target": true,
+      "cjd_preset_type": "bom",
+      "extra_args": ["--min-num-calls", "1"]
+    }
+  ]
+}

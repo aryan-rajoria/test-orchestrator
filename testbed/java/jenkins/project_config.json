@@ -1,0 +1,22 @@
+{
+  "github_url": "https://github.com/jenkinsci/jenkins.git",
+  "language": "java",
+  "project_dir_in_repo": ".",
+  "host_post_clone_commands": [],
+  "install_commands_container": [
+    "mvn clean install -DskipTests -Dinvoker.skip=true"
+  ],
+  "build_commands_container": [],
+  "atom_operations": [
+    {
+      "name": "java_usages_analysis",
+      "atom_main_command": "usages",
+      "atom_primary_output_container": "app.atom",
+      "atom_slice_output_container": "usages.slices.json",
+      "host_target_file_suffix": "usages.slices.json",
+      "is_json_diff_target": true,
+      "cjd_preset_type": "bom",
+      "extra_args": ["--min-num-calls", "1"]
+    }
+  ]
+}

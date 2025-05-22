@@ -1,0 +1,24 @@
+{
+  "github_url": "https://github.com/vuejs/vue.git",
+  "language": "javascript", 
+  "project_dir_in_repo": ".",
+  "host_post_clone_commands": [],
+  "install_commands_container": [
+    "yarn install"
+  ],
+  "build_commands_container": [
+    "yarn build # Example build, atom might just need dependencies"
+  ],
+  "atom_operations": [
+    {
+      "name": "javascript_usages_analysis",
+      "atom_main_command": "usages",
+      "atom_primary_output_container": "app.atom",
+      "atom_slice_output_container": "usages.slices.json",
+      "host_target_file_suffix": "usages.slices.json",
+      "is_json_diff_target": true,
+      "cjd_preset_type": "bom",
+      "extra_args": ["--min-num-calls", "1"]
+    }
+  ]
+}
